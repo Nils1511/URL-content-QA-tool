@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Content Q&A Tool</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto py-8 px-4">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">URL Content Q&A Tool</h1>
+            <p class="text-gray-600 mt-2">Enter URLs to extract content, then ask questions about that information</p>
+        </header>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Add URLs to Analyze</h2>
+            <div class="flex flex-col md:flex-row gap-2">
+                <input id="urlInput" type="url" placeholder="Enter a URL (e.g., https://example.com)" 
+                       class="flex-grow p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="addUrlBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition">
+                    Add URL
+                </button>
+            </div>
+            
+            <div id="urlList" class="mt-4">
+                <!-- URLs will be added here -->
+                <p id="noUrlsMessage" class="text-gray-500 italic">No URLs added yet</p>
+            </div>
+            
+            <div class="mt-4">
+                <button id="fetchContentBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Fetch Content
+                </button>
+                <div id="fetchLoader" class="loader"></div>
+                <p id="fetchStatus" class="text-sm mt-2 text-gray-600"></p>
+            </div>
+        </div>
+        
+        <div id="qaSection" class="bg-white rounded-lg shadow-md p-6 mb-6" style="display: none;">
+            <h2 class="text-xl font-semibold mb-4">Ask Questions</h2>
+            <div class="flex flex-col md:flex-row gap-2">
+                <input id="questionInput" type="text" placeholder="Ask a question about the content..." 
+                       class="flex-grow p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="askBtn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition">
+                    Ask
+                </button>
+            </div>
+            <div id="askLoader" class="loader"></div>
+            
+            <div id="answerSection" class="mt-6" style="display: none;">
+                <h3 class="font-semibold text-lg">Answer:</h3>
+                <div id="answerContent" class="bg-gray-50 p-4 rounded mt-2 whitespace-pre-wrap"></div>
+                <p id="answerSourceNote" class="text-sm text-gray-500 mt-2 italic">Answer generated using only the content from provided URLs</p>
+            </div>
+        </div>
+        
+        <div id="contentPreview" class="bg-white rounded-lg shadow-md p-6" style="display: none;">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Extracted Content Preview</h2>
+                <button id="togglePreviewBtn" class="text-blue-500 hover:underline text-sm">
+                    Show Preview
+                </button>
+            </div>
+            <div id="previewContent" class="bg-gray-50 p-4 rounded text-sm overflow-auto max-h-60" style="display: none;">
+                <!-- Content preview will be shown here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store URLs and content
+        const urls = [];
+        let extractedContent = "";
+        let isContentFetched = false;
+        
+        // DOM elements
+        const urlInput = document.getElementById('urlInput');
+        const addUrlBtn = document.getElementById('addUrlBtn');
+        const urlList = document.getElementById('urlList');
+        const noUrlsMessage = document.getElementById('noUrlsMessage');
+        const fetchContentBtn = document.getElementById('fetchContentBtn');
+        const fetchLoader = document.getElementById('fetchLoader');
+        const fetchStatus = document.getElementById('fetchStatus');
+        const qaSection = document.getElementById('qaSection');
+        const questionInput = document.getElementById('questionInput');
+        const askBtn = document.getElementById('askBtn');
+        const askLoader = document.getElementById('askLoader');
+        const answerSection = document.getElementById('answerSection');
+        const answerContent = document.getElementById('answerContent');
+        const contentPreview = document.getElementById('contentPreview');
+        const togglePreviewBtn = document.getElementById('togglePreviewBtn');
+        const previewContent = document.getElementById('previewContent');
+        
+        // Add URL
+        addUrlBtn.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            if (url && isValidURL(url) && !urls.includes(url)) {
+                urls.push(url);
+                updateUrlList();
+                urlInput.value = '';
+                fetchContentBtn.disabled = false;
+                isContentFetched = false;
+                
+                // Hide answer section when URLs change
+                qaSection.style.display = 'none';
+                contentPreview.style.display = 'none';
+            } else if (!isValidURL(url)) {
+                alert('Please enter a valid URL (e.g., https://example.com)');
+            } else if (urls.includes(url)) {
+                alert('This URL has already been added');
+            }
+        });
+        
+        // Update URL list display
+        function updateUrlList() {
+            if (urls.length > 0) {
+                noUrlsMessage.style.display = 'none';
+                
+                // Clear and rebuild list
+                const listItems = urls.map((url, index) => {
+                    return `
+                        <div class="flex justify-between items-center bg-gray-50 p-2 rounded mb-2">
+                            <span class="truncate flex-grow pr-2">${url}</span>
+                            <button class="text-red-500 hover:text-red-700" data-index="${index}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+                
+                urlList.innerHTML = listItems;
+                
+                // Add delete event listeners
+                document.querySelectorAll('#urlList button').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const index = parseInt(button.dataset.index);
+                        urls.splice(index, 1);
+                        updateUrlList();
+                        
+                        if (urls.length === 0) {
+                            noUrlsMessage.style.display = 'block';
+                            fetchContentBtn.disabled = true;
+                            qaSection.style.display = 'none';
+                            contentPreview.style.display = 'none';
+                        }
+                        
+                        // Reset content state when URLs change
+                        isContentFetched = false;
+                    });
+                });
+            } else {
+                noUrlsMessage.style.display = 'block';
+                urlList.innerHTML = '';
+            }
+        }
+        
+        // Validate URL format
+        function isValidURL(url) {
+            try {
+                new URL(url);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // Fetch content from URLs
+        fetchContentBtn.addEventListener('click', async () => {
+            fetchLoader.style.display = 'block';
+            fetchStatus.textContent = 'Fetching content from URLs...';
+            fetchContentBtn.disabled = true;
+            
+            try {
+                // This would be your actual API call to the backend
+                // For demo purposes, we'll simulate a fetch
+                extractedContent = await simulateFetchContent(urls);
+                console.log('Extracted content:', extractedContent);
+                fetchStatus.textContent = 'Content successfully extracted!';
+                fetchStatus.className = 'text-sm mt-2 text-green-600';
+                
+                // Show Q&A section and content preview
+                qaSection.style.display = 'block';
+                contentPreview.style.display = 'block';
+                previewContent.textContent = extractedContent.length > 1000 
+                    ? extractedContent.substring(0, 1000) + '...' 
+                    : extractedContent;
+                
+                isContentFetched = true;
+            } catch (error) {
+                console.error('Error fetching content:', error);
+                fetchStatus.textContent = 'Error fetching content. Please try again.';
+                fetchStatus.className = 'text-sm mt-2 text-red-600';
+                fetchContentBtn.disabled = false;
+            } finally {
+                fetchLoader.style.display = 'none';
+            }
+        });
+        
+        // Toggle content preview
+        togglePreviewBtn.addEventListener('click', () => {
+            if (previewContent.style.display === 'none') {
+                previewContent.style.display = 'block';
+                togglePreviewBtn.textContent = 'Hide Preview';
+            } else {
+                previewContent.style.display = 'none';
+                togglePreviewBtn.textContent = 'Show Preview';
+            }
+        });
+        
+        // Ask question
+        askBtn.addEventListener('click', async () => {
+            const question = questionInput.value.trim();
+            
+            if (!question) {
+                alert('Please enter a question');
+                return;
+            }
+            
+            if (!isContentFetched) {
+                alert('Please fetch content first');
+                return;
+            }
+            
+            askLoader.style.display = 'block';
+            answerSection.style.display = 'none';
+            
+            try {
+                // This would be your actual API call to the backend
+                // For demo purposes, we'll simulate an answer
+                const answer = await simulateAskQuestion(question, extractedContent);
+                
+                answerContent.textContent = answer;
+                answerSection.style.display = 'block';
+            } catch (error) {
+                console.error('Error getting answer:', error);
+                answerContent.textContent = 'Sorry, there was an error processing your question. Please try again.';
+                answerSection.style.display = 'block';
+            } finally {
+                askLoader.style.display = 'none';
+            }
+        });
+        
+        // Fetch content API
+        async function simulateFetchContent(urls) {
+            try {
+                const response = await fetch('/api/fetch-content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ urls }),
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to fetch content');
+                }
+                
+                const data = await response.json();
+                return data.content;
+            } catch (error) {
+                console.error('Error fetching content:', error);
+                throw error;
+            }
+        }
+        
+        // Ask question API
+        async function simulateAskQuestion(question, content) {
+            try {
+                const response = await fetch('/api/ask-question', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question, content }),
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to get answer');
+                }
+                
+                const data = await response.json();
+                return data.answer;
+            } catch (error) {
+                console.error('Error getting answer:', error);
+                throw error;
+            }
+        }
+    </script>
+</body>
+</html>
