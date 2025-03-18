@@ -29,7 +29,7 @@ A web-based tool that allows users to extract content from web pages and ask que
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/url-content-qa-tool.git
+   git clone https://github.com/Nils1511/URL-content-QA-tool.git
    cd url-content-qa-tool
    ```
 
@@ -45,8 +45,9 @@ A web-based tool that allows users to extract content from web pages and ask que
 
 4. Add your API keys to the `.env` file:
    ```
-   FIRECRAWL_KEY=your_firecrawl_api_key_here
+   FIRECRAWL_API_KEY=your_firecrawl_api_key_here
    GEMINI_KEY=your_gemini_api_key_here
+   PORT=3000
    ```
 
 ### Running the Application
@@ -78,7 +79,6 @@ A web-based tool that allows users to extract content from web pages and ask que
 ├── server.js            # Main server file
 ├── package.json         # Project dependencies
 ├── .env                 # Environment variables (not committed to git)
-├── .env.example         # Example environment variable file
 ├── public/              # Public assets
 │   └── index.html       # Main HTML file
 │
