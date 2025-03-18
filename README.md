@@ -38,9 +38,9 @@ A web-based tool that allows users to extract content from web pages and ask que
    npm install
    ```
 
-3. Create a `.env` file in the root directory based on the `.env.example` file:
+3. Create a `.env` file in the root directory:
    ```
-   cp .env.example .env
+   cp .env
    ```
 
 4. Add your API keys to the `.env` file:
@@ -90,7 +90,3 @@ A web-based tool that allows users to extract content from web pages and ask que
 - **Frontend**: HTML, CSS (Tailwind CSS), JavaScript
 - **Backend**: Node.js, Express
 - **APIs**: Firecrawl (web scraping), Gemini (question answering)
-
-## License
-
-MIT
